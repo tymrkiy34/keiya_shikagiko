@@ -5,42 +5,38 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>品質チェックシート</title>
 <style>
-  @page { size: A4; margin: 12mm; }
+  @page { size: 257mm 182mm; margin: 10mm; }
   :root { --ink:#1f2d3a; --accent:#2a7f8e; --line:#b9c6cc; --soft:#eef5f7; }
   * { box-sizing: border-box; }
   body { margin:0; background:#e9eef0; color:var(--ink);
-    font-family:"Hiragino Sans","Yu Gothic","Meiryo",sans-serif; font-size:9.5pt; line-height:1.4; }
-  .sheet { width:210mm; min-height:297mm; margin:10mm auto; padding:12mm; background:#fff; }
-  @media print { body{background:#fff} .sheet{margin:0; padding:0; width:auto; min-height:0} }
+    font-family:"Hiragino Sans","Yu Gothic","Meiryo",sans-serif; font-size:11pt; line-height:1.4; }
+  .sheet { width:257mm; height:182mm; margin:10mm auto; padding:10mm; background:#fff; }
+  @media print { body{background:#fff} .sheet{margin:0; padding:0; width:auto; height:auto} }
 
   header { display:flex; justify-content:space-between; align-items:flex-end;
-    border-bottom:3px solid var(--accent); padding-bottom:6px; margin-bottom:12px; }
+    border-bottom:3px solid var(--accent); padding-bottom:5px; margin-bottom:10px; }
   h1 { margin:0; font-size:22pt; letter-spacing:.15em; color:var(--accent); }
-  header p { margin:0; font-size:9pt; }
-  .lab { text-align:right; font-size:9pt; }
-  .lab span { display:inline-block; min-width:50mm; border-bottom:1px solid var(--line); }
+  header p { margin:0; font-size:9.5pt; }
 
-  .lead { background:var(--soft); border-left:4px solid var(--accent);
-    padding:6px 10px; margin:0 0 12px; font-size:9.5pt; }
-
-  h2 { font-size:11pt; margin:10px 0 5px; padding-left:8px; border-left:4px solid var(--accent); }
+  .cols { display:grid; grid-template-columns:1.1fr 1fr; gap:10mm; }
+  h2 { font-size:11.5pt; margin:0 0 5px; padding-left:8px; border-left:4px solid var(--accent); }
+  .block + .block { margin-top:12px; }
 
   table { width:100%; border-collapse:collapse; }
-  th, td { border:1px solid var(--line); padding:3px 7px; text-align:left; vertical-align:middle; }
-  th { background:var(--soft); font-weight:600; width:22%; font-size:9.5pt; }
-  .fill { height:7mm; }
+  th, td { border:1px solid var(--line); padding:4px 8px; vertical-align:middle; }
+  th { background:var(--soft); font-weight:600; text-align:left; width:30%; }
+  .fill { height:9mm; }
+  .check thead th { text-align:center; width:17mm; font-size:10pt; }
+  .check thead th:first-child { width:auto; text-align:left; }
+  .check td { height:9.5mm; }
+  .c { text-align:center; }
+  .box { display:inline-block; width:5mm; height:5mm; border:1.4px solid var(--ink); border-radius:1px; vertical-align:middle; }
 
-  .check th.item { width:auto; }
-  .check th.c, .check td.c { width:15mm; text-align:center; }
-  .box { display:inline-block; width:4.2mm; height:4.2mm; border:1.3px solid var(--ink); border-radius:1px; }
-
-  .rating { display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
-  .rating b { font-size:12pt; }
-
-  .memo { height:24mm; border:1px solid var(--line); padding:6px 8px; font-size:9pt; color:#7b8a93; }
-
-  footer { margin-top:10px; font-size:9pt; text-align:center; color:#5a6b75; }
-  .return { margin-top:8px; border:1px dashed var(--accent); padding:6px 10px; font-size:9pt; }
+  .rating { display:flex; justify-content:space-between; align-items:center; font-size:9.5pt; }
+  .s { display:flex; flex-direction:column; align-items:center; gap:2px; }
+  .s b { font-size:13pt; }
+  .memo { height:62mm; border:1px solid var(--line); padding:6px 8px; font-size:9.5pt; color:#7b8a93; }
+  footer { margin-top:8px; font-size:9.5pt; text-align:center; color:#5a6b75; }
 </style>
 </head>
 <body>
@@ -48,61 +44,56 @@
   <header>
     <div>
       <h1>品質チェックシート</h1>
-      <p>Quality Check Sheet — 歯科技工物 納品フィードバック</p>
+      <p>歯科技工物のご使用後、該当箇所に ✔ をお願いします。</p>
     </div>
-    <div class="lab">技工所名：<span>&nbsp;</span><br>担当技工士：<span>&nbsp;</span></div>
+    <p>Quality Check Sheet</p>
   </header>
 
-  <p class="lead">技工物をご使用いただいた後、気づかれた点をご記入ください。いただいたご意見は今後の品質向上に活用いたします。お手数ですが、該当箇所に ✔ をお願いします。</p>
+  <div class="cols">
+    <div>
+      <div class="block">
+        <h2>症例情報</h2>
+        <table>
+          <tr><th>歯科医院名</th><td class="fill"></td></tr>
+          <tr><th>患者名 / ID</th><td class="fill"></td></tr>
+          <tr><th>納品日</th><td class="fill">　　　年　　月　　日</td></tr>
+        </table>
+      </div>
+      <div class="block">
+        <h2>チェック項目</h2>
+        <table class="check">
+          <thead><tr><th>項目</th><th>良好</th><th>調整<br>必要</th><th>不良</th></tr></thead>
+          <tbody>
+      <tr><td>適合（支台歯・辺縁）</td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td></tr>
+      <tr><td>隣接面コンタクト</td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td></tr>
+      <tr><td>咬合（接触・高さ）</td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td></tr>
+      <tr><td>形態・豊隆</td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td></tr>
+      <tr><td>色調（シェード）</td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td></tr>
+      <tr><td>表面性状・研磨</td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
 
-  <h2>ご記入者・症例情報</h2>
-  <table>
-    <tr><th>歯科医院名</th><td class="fill"></td><th>ご担当医</th><td class="fill"></td></tr>
-    <tr><th>患者名 / ID</th><td class="fill"></td><th>納品日</th><td class="fill">　　　年　　月　　日</td></tr>
-    <tr><th>技工物の種類</th><td colspan="3" class="fill"></td></tr>
-    <tr><th>記入日</th><td class="fill">　　　年　　月　　日</td><th>装着日</th><td class="fill">　　　年　　月　　日</td></tr>
-  </table>
-
-  <h2>チェック項目</h2>
-  <table class="check">
-    <tr><th class="item">項目</th><th class="c">良好</th><th class="c">調整<br>必要</th><th class="c">不良</th><th style="width:38%">コメント</th></tr>
-    <tr><td>① 適合（支台歯・辺縁の適合）</td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td></td></tr>
-    <tr><td>② 隣接面コンタクト</td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td></td></tr>
-    <tr><td>③ 咬合（咬合接触・高さ）</td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td></td></tr>
-    <tr><td>④ 形態・豊隆（歯冠形態・歯肉との調和）</td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td></td></tr>
-    <tr><td>⑤ 色調（シェードの再現性）</td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td></td></tr>
-    <tr><td>⑥ 表面性状・研磨・艶</td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td></td></tr>
-    <tr><td>⑦ 指示書どおりの仕上がり</td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td></td></tr>
-    <tr><td>⑧ 納期・梱包状態</td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td></td></tr>
-  </table>
-
-  <h2>チェア上での調整</h2>
-  <table>
-    <tr>
-      <th>調整の有無</th>
-      <td><span class="box"></span> なし　　<span class="box"></span> 軽微な調整　　<span class="box"></span> 大幅な調整　　<span class="box"></span> 再製作</td>
-    </tr>
-    <tr>
-      <th>調整箇所</th>
-      <td><span class="box"></span> 咬合　<span class="box"></span> 隣接面　<span class="box"></span> 辺縁　<span class="box"></span> 形態　<span class="box"></span> 色調　<span class="box"></span> その他（　　　　　）</td>
-    </tr>
-  </table>
-
-  <h2>総合評価</h2>
-  <div class="rating">
-    <span>満足 ←</span>
-    <span><span class="box"></span> <b>5</b></span>
-    <span><span class="box"></span> <b>4</b></span>
-    <span><span class="box"></span> <b>3</b></span>
-    <span><span class="box"></span> <b>2</b></span>
-    <span><span class="box"></span> <b>1</b></span>
-    <span>→ 不満</span>
+    <div>
+      <div class="block">
+        <h2>総合評価</h2>
+        <div class="rating">
+          <span>満足</span>
+      <div class="s"><span class="box"></span><b>5</b></div>
+      <div class="s"><span class="box"></span><b>4</b></div>
+      <div class="s"><span class="box"></span><b>3</b></div>
+      <div class="s"><span class="box"></span><b>2</b></div>
+      <div class="s"><span class="box"></span><b>1</b></div>
+          <span>不満</span>
+        </div>
+      </div>
+      <div class="block">
+        <h2>ご意見・ご要望</h2>
+        <div class="memo">気になった点を自由にご記入ください</div>
+      </div>
+    </div>
   </div>
-
-  <h2>ご意見・ご要望</h2>
-  <div class="memo">自由にご記入ください（今後のご指示の好み・シェードの傾向・咬合の癖など）</div>
-
-  <div class="return">ご返送方法：次回納品時にお渡しいただく ／ 写真を撮ってメール・LINEで送付 ／ FAX　（技工所連絡先：　　　　　　　　　　　　　　　　　）</div>
 
   <footer>ご協力ありがとうございました。</footer>
 </div>
