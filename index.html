@@ -1,0 +1,536 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>技工所管理 - 納品書・請求書・技工物管理</title>
+<style>
+:root{--bg:#f4f6f8;--card:#fff;--ink:#1d2733;--sub:#667085;--line:#dde3ea;--pri:#0e7490;--pri-d:#155e75;--warn:#b42318;--ok:#067647;--amber:#b54708}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif;background:var(--bg);color:var(--ink);font-size:14px}
+header{background:var(--pri-d);color:#fff;padding:10px 16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+header h1{font-size:17px;margin:0}
+nav{display:flex;gap:4px;flex-wrap:wrap}
+nav a{color:#cfeef5;text-decoration:none;padding:7px 12px;border-radius:6px}
+nav a.on,nav a:hover{background:#ffffff26;color:#fff}
+main{max-width:1180px;margin:0 auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
+.card h2{font-size:15px;margin:0 0 10px}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px}
+.stat b{display:block;font-size:22px;margin-top:4px}
+.stat.w b{color:var(--warn)}
+table{width:100%;border-collapse:collapse}
+th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+th{font-size:12px;color:var(--sub);background:#f8fafc;white-space:nowrap}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+.scroll{overflow-x:auto}
+button,.btn{font:inherit;background:var(--pri);color:#fff;border:0;border-radius:6px;padding:6px 12px;cursor:pointer}
+button:hover{background:var(--pri-d)}
+button.s{background:#fff;color:var(--pri-d);border:1px solid var(--pri)}
+button.d{background:#fff;color:var(--warn);border:1px solid #f0b4ae}
+button.sm{padding:3px 8px;font-size:12px}
+input,select,textarea{font:inherit;padding:6px 8px;border:1px solid #c5ced8;border-radius:6px;background:#fff;max-width:100%}
+input[type=checkbox]{width:auto}
+label{display:block;font-size:12px;color:var(--sub);margin-bottom:3px}
+.f{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:10px}
+.f>div>input,.f>div>select,.f>div>textarea{width:100%}
+.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.bar .sp{flex:1}
+.tag{display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;background:#eef2f6}
+.tag.受付{background:#e0f2fe;color:#075985}.tag.製作中{background:#fef3c7;color:var(--amber)}
+.tag.完成{background:#dcfce7;color:var(--ok)}.tag.納品済{background:#eef2f6;color:var(--sub)}
+.tag.未入金{background:#fee4e2;color:var(--warn)}.tag.一部入金{background:#fef3c7;color:var(--amber)}.tag.入金済{background:#dcfce7;color:var(--ok)}
+.late{color:var(--warn);font-weight:700}
+.muted{color:var(--sub);font-size:12px}
+dialog{border:0;border-radius:12px;padding:18px;width:min(900px,96vw);max-height:92vh;overflow:auto;box-shadow:0 10px 40px #0005}
+dialog::backdrop{background:#0006}
+dialog h3{margin:0 0 12px}
+#printArea{display:none}
+.doc{background:#fff;color:#000;font-size:12px;max-width:760px;margin:0 auto}
+.doc h1{text-align:center;letter-spacing:.6em;font-size:22px;margin:0 0 14px;border-bottom:2px solid #000;padding-bottom:6px}
+.doc .row{display:flex;justify-content:space-between;gap:20px;margin-bottom:12px}
+.doc table th{background:#eee;color:#000;border:1px solid #888}
+.doc table td{border:1px solid #aaa}
+.doc .to{font-size:16px;border-bottom:1px solid #000;padding-bottom:2px;display:inline-block;min-width:260px}
+.doc .big{font-size:18px;font-weight:700;border:2px solid #000;padding:6px 12px;display:inline-block;margin:6px 0 12px}
+.doc .tot{width:260px;margin-left:auto;margin-top:8px}
+@media print{
+  body{background:#fff}
+  header,main,dialog{display:none!important}
+  #printArea{display:block}
+  @page{size:A4;margin:14mm}
+}
+@media(max-width:640px){main{padding:8px}}
+</style>
+</head>
+<body>
+<header>
+  <h1>🦷 技工所管理</h1>
+  <nav id="nav"></nav>
+</header>
+<main id="main"></main>
+<dialog id="dlg"></dialog>
+<div id="printArea"></div>
+<datalist id="priceNames"></datalist>
+
+<script>
+/* ===== ユーティリティ ===== */
+const KEY = 'shikagiko-db-v1';
+const $ = s => document.querySelector(s);
+const h = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const yen = n => '¥' + Math.round(n || 0).toLocaleString('ja-JP');
+const pad = (n, w = 2) => String(n).padStart(w, '0');
+const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const today = () => ymd(new Date());
+const thisMonth = () => today().slice(0, 7);
+const addDays = (s, n) => { const d = new Date(s); d.setDate(d.getDate() + n); return ymd(d); };
+const uid = () => Math.random().toString(36).slice(2, 10);
+const STATUS = ['受付', '製作中', '完成', '納品済'];
+const KINDS = ['新規', '修理', '再製(無償)', '調整'];
+
+/* ===== データ ===== */
+function seed() {
+  const p = (code, cat, name, price, tax) => ({ id: uid(), code, cat, name, price, tax, note: '' });
+  return {
+    settings: { name: '○○歯科技工所', zip: '', addr: '', tel: '', fax: '', email: '', invoiceNo: '', bank: '', taxRate: 10, techs: ['技工士A'], payDays: 30 },
+    clients: [], jobs: [], deliveries: [], invoices: [],
+    prices: [   // ※サンプル価格です。実際の料金に必ず書き換えてください
+      p('H01', '保険 冠・ブリッジ', 'FMC(全部金属冠)', 1000, 0),
+      p('H02', '保険 冠・ブリッジ', 'CAD/CAM冠', 2000, 0),
+      p('H03', '保険 冠・ブリッジ', 'インレー', 700, 0),
+      p('H04', '保険 義歯', '総義歯(上下)', 10000, 0),
+      p('H05', '保険 義歯', '部分床義歯', 5000, 0),
+      p('J01', '自費 セラミック', 'ジルコニアクラウン', 20000, 10),
+      p('J02', '自費 セラミック', 'e.max クラウン', 25000, 10),
+      p('J03', '自費 セラミック', 'ラミネートベニア', 30000, 10),
+      p('J04', '自費 義歯', 'ノンクラスプデンチャー', 60000, 10),
+      p('M01', '修理・その他', '義歯修理', 3000, 0),
+      p('M02', '修理・その他', 'ナイトガード', 8000, 10),
+    ],
+    seq: {}
+  };
+}
+function load() {
+  try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && d.settings) return d; } catch (e) {}
+  return seed();
+}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { alert('保存に失敗しました(ブラウザの保存領域を確認してください)'); } }
+let db = load();
+const S = { jobStatus: 'active', jobQ: '', invMonth: thisMonth(), dMonth: '' };
+
+function nextNo(prefix) {
+  db.seq[prefix] = (db.seq[prefix] || 0) + 1;
+  return prefix + '-' + pad(db.seq[prefix], 4);
+}
+const client = id => db.clients.find(c => c.id === id) || { name: '(削除済み)' };
+const price = id => db.prices.find(p => p.id === id);
+
+/* 税計算: 税率ごとに合計し、端数は切り捨て(税率ごとに1回) */
+function totals(lines) {
+  const by = {};
+  lines.forEach(l => { const r = Number(l.tax) || 0; by[r] = by[r] || { sub: 0, tax: 0 }; by[r].sub += l.qty * l.unit; });
+  let sub = 0, tax = 0;
+  Object.entries(by).forEach(([r, v]) => { v.tax = Math.floor(v.sub * r / 100); sub += v.sub; tax += v.tax; });
+  return { by, sub, tax, total: sub + tax };
+}
+const jobTotal = j => totals(j.items).total;
+const delivLines = d => d.lines;
+const invDelivs = i => i.deliveryIds.map(id => db.deliveries.find(d => d.id === id)).filter(Boolean);
+const invLines = i => invDelivs(i).flatMap(d => d.lines);
+const invTotal = i => totals(invLines(i)).total;
+const invPaid = i => i.payments.reduce((a, p) => a + p.amount, 0);
+const invState = i => { const p = invPaid(i), t = invTotal(i); return p <= 0 ? '未入金' : p >= t ? '入金済' : '一部入金'; };
+
+/* ===== 画面 ===== */
+const TABS = [['dash', 'ホーム'], ['jobs', '技工物管理'], ['deliv', '納品書'], ['inv', '請求・入金'], ['clients', '取引先'], ['prices', '料金表'], ['set', '設定・バックアップ']];
+const views = { dash, jobs, deliv, inv, clients, prices, set };
+
+function render() {
+  const v = location.hash.slice(1) || 'dash';
+  $('#nav').innerHTML = TABS.map(([k, n]) => `<a href="#${k}" class="${k === v ? 'on' : ''}">${n}</a>`).join('');
+  $('#main').innerHTML = (views[v] || dash)();
+  $('#priceNames').innerHTML = db.prices.map(p => `<option value="${h(p.name)}">`).join('');
+  if (v === 'jobs') jobRows();
+}
+window.addEventListener('hashchange', render);
+
+function dash() {
+  const t = today(), m = thisMonth();
+  const open = db.jobs.filter(j => j.status !== '納品済');
+  const late = open.filter(j => j.dueDate && j.dueDate < t);
+  const dueToday = open.filter(j => j.dueDate === t);
+  const waitDeliv = db.jobs.filter(j => j.status === '完成');
+  const sales = db.deliveries.filter(d => d.date.slice(0, 7) === m).reduce((a, d) => a + totals(d.lines).total, 0);
+  const unpaid = db.invoices.reduce((a, i) => a + invTotal(i) - invPaid(i), 0);
+  const uninv = db.deliveries.filter(d => !d.invoiceId).reduce((a, d) => a + totals(d.lines).total, 0);
+  const soon = open.filter(j => j.dueDate && j.dueDate <= addDays(t, 3)).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  return `
+  <div class="grid" style="margin-bottom:14px">
+    <div class="stat ${late.length ? 'w' : ''}">納期超過<b>${late.length}件</b></div>
+    <div class="stat">本日納期<b>${dueToday.length}件</b></div>
+    <div class="stat">製作中・受付<b>${open.length}件</b></div>
+    <div class="stat">納品待ち(完成)<b>${waitDeliv.length}件</b></div>
+    <div class="stat">今月の納品額(税込)<b>${yen(sales)}</b></div>
+    <div class="stat">未請求の納品<b>${yen(uninv)}</b></div>
+    <div class="stat ${unpaid ? 'w' : ''}">未入金残高<b>${yen(unpaid)}</b></div>
+  </div>
+  <div class="card"><h2>納期が近い技工物(3日以内・超過含む)</h2>
+    ${soon.length ? `<div class="scroll"><table><tr><th>納期</th><th>医院</th><th>患者</th><th>内容</th><th>状態</th></tr>
+    ${soon.map(j => `<tr><td class="${j.dueDate < t ? 'late' : ''}">${h(j.dueDate)}</td><td>${h(client(j.clientId).name)}</td><td>${h(j.patient)}</td><td>${h(itemsText(j))}</td><td><span class="tag ${j.status}">${j.status}</span></td></tr>`).join('')}</table></div>` : '<p class="muted">該当なし</p>'}
+  </div>
+  <div class="card"><h2>使い方の流れ</h2>
+    <ol style="margin:0;padding-left:20px;line-height:1.9">
+      <li><b>設定</b>で自社情報・振込先・インボイス登録番号を入力、<b>料金表</b>と<b>取引先</b>(歯科医院)を登録</li>
+      <li>技工指示書を受け取ったら<b>技工物管理</b>で受付登録(患者名・歯式・シェード・納期・品目)</li>
+      <li>進捗を「受付→製作中→完成」に更新</li>
+      <li>完成品を届けるとき<b>納品書</b>で案件を選んで発行・印刷(状態は自動で「納品済」)</li>
+      <li>月末(締め日)に<b>請求・入金</b>で請求書を一括作成・印刷、入金があれば入金登録</li>
+    </ol></div>`;
+}
+const itemsText = j => j.items.map(i => i.name + (i.qty > 1 ? '×' + i.qty : '')).join(', ');
+
+/* --- 技工物管理 --- */
+function jobs() {
+  return `<div class="card">
+    <div class="bar">
+      <button onclick="A.jobEdit()">＋ 新規受付</button>
+      <select onchange="S.jobStatus=this.value;jobRows()">
+        ${[['active', '未納品(受付〜完成)'], ['all', 'すべて'], ...STATUS.map(s => [s, s])].map(([v, n]) => `<option value="${v}" ${S.jobStatus === v ? 'selected' : ''}>${n}</option>`).join('')}
+      </select>
+      <input placeholder="医院・患者・内容で検索" value="${h(S.jobQ)}" oninput="S.jobQ=this.value;jobRows()" style="min-width:220px">
+      <span class="sp"></span><button class="s" onclick="A.jobsCsv()">CSV出力</button>
+    </div>
+    <div class="scroll"><table><thead><tr><th>案件No</th><th>受付</th><th>納期</th><th>医院</th><th>患者名</th><th>内容</th><th>担当</th><th class="n">金額(税込)</th><th>状態</th><th></th></tr></thead>
+    <tbody id="jobBody"></tbody></table></div></div>`;
+}
+function jobRows() {
+  const t = today(), q = S.jobQ.trim().toLowerCase();
+  let list = db.jobs.filter(j => S.jobStatus === 'all' ? true : S.jobStatus === 'active' ? j.status !== '納品済' : j.status === S.jobStatus);
+  if (q) list = list.filter(j => (client(j.clientId).name + j.patient + itemsText(j) + j.no).toLowerCase().includes(q));
+  list.sort((a, b) => (a.dueDate || '9').localeCompare(b.dueDate || '9'));
+  $('#jobBody').innerHTML = list.map(j => `<tr>
+    <td>${h(j.no)}${j.kind !== '新規' ? `<br><span class="muted">${h(j.kind)}</span>` : ''}</td><td>${h(j.receivedDate)}</td>
+    <td class="${j.dueDate && j.dueDate < t && j.status !== '納品済' ? 'late' : ''}">${h(j.dueDate)}</td>
+    <td>${h(client(j.clientId).name)}</td><td>${h(j.patient)}</td><td>${h(itemsText(j))}</td><td>${h(j.tech)}</td>
+    <td class="n">${yen(jobTotal(j))}</td>
+    <td>${j.status === '納品済' ? `<span class="tag 納品済">納品済</span>` : `<select onchange="A.jobStatus('${j.id}',this.value)">${STATUS.slice(0, 3).map(s => `<option ${s === j.status ? 'selected' : ''}>${s}</option>`).join('')}</select>`}</td>
+    <td style="white-space:nowrap"><button class="s sm" onclick="A.jobEdit('${j.id}')">編集</button> <button class="s sm" onclick="A.jobSheet('${j.id}')">作業票</button></td>
+  </tr>`).join('') || '<tr><td colspan="10" class="muted">該当する技工物はありません</td></tr>';
+}
+
+/* --- 納品書 --- */
+function deliv() {
+  const ready = db.jobs.filter(j => j.status === '完成' && !j.deliveryId).sort((a, b) => a.clientId.localeCompare(b.clientId));
+  const ds = [...db.deliveries].sort((a, b) => b.date.localeCompare(a.date) || b.no.localeCompare(a.no));
+  return `<div class="card"><h2>納品待ち(状態が「完成」の技工物)</h2>
+    ${ready.length ? `<div class="scroll"><table><tr><th></th><th>医院</th><th>案件No</th><th>患者</th><th>内容</th><th class="n">金額(税込)</th></tr>
+    ${ready.map(j => `<tr><td><input type="checkbox" class="rdy" value="${j.id}" checked></td><td>${h(client(j.clientId).name)}</td><td>${h(j.no)}</td><td>${h(j.patient)}</td><td>${h(itemsText(j))}</td><td class="n">${yen(jobTotal(j))}</td></tr>`).join('')}</table></div>
+    <div class="bar" style="margin-top:10px"><label style="margin:0">納品日</label><input type="date" id="dDate" value="${today()}">
+    <button onclick="A.makeDeliv()">選択した案件で納品書を作成(医院ごと)</button></div>`
+      : '<p class="muted">納品待ちの技工物はありません。「技工物管理」で状態を「完成」にするとここに表示されます。</p>'}</div>
+  <div class="card"><h2>発行済み納品書</h2>
+    <div class="scroll"><table><tr><th>納品書No</th><th>納品日</th><th>医院</th><th>件数</th><th class="n">税込金額</th><th>請求</th><th></th></tr>
+    ${ds.map(d => `<tr><td>${h(d.no)}</td><td>${h(d.date)}</td><td>${h(client(d.clientId).name)}</td><td>${d.jobIds.length}</td><td class="n">${yen(totals(d.lines).total)}</td>
+    <td>${d.invoiceId ? h((db.invoices.find(i => i.id === d.invoiceId) || {}).no || '') : '<span class="muted">未請求</span>'}</td>
+    <td style="white-space:nowrap"><button class="s sm" onclick="A.print('deliv','${d.id}')">表示・印刷</button> ${d.invoiceId ? '' : `<button class="d sm" onclick="A.delDeliv('${d.id}')">取消</button>`}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">まだありません</td></tr>'}
+    </table></div></div>`;
+}
+
+/* --- 請求・入金 --- */
+function inv() {
+  const iv = [...db.invoices].sort((a, b) => b.issueDate.localeCompare(a.issueDate) || b.no.localeCompare(a.no));
+  const pend = db.deliveries.filter(d => !d.invoiceId);
+  return `<div class="card"><h2>請求書の作成(締め処理)</h2>
+    <p class="muted">各医院の「締め日」までに納品された未請求の納品書をまとめて請求書にします。未請求の納品書:${pend.length}件</p>
+    <div class="bar"><label style="margin:0">対象月</label><input type="month" id="iMonth" value="${S.invMonth}" onchange="S.invMonth=this.value">
+    <button onclick="A.makeInv()">請求書を一括作成</button></div></div>
+  <div class="card"><h2>請求書一覧・入金管理</h2>
+    <div class="scroll"><table><tr><th>請求書No</th><th>発行日</th><th>医院</th><th>対象</th><th class="n">請求額</th><th class="n">入金済</th><th class="n">残高</th><th>状態</th><th></th></tr>
+    ${iv.map(i => { const t = invTotal(i), p = invPaid(i); return `<tr><td>${h(i.no)}</td><td>${h(i.issueDate)}</td><td>${h(client(i.clientId).name)}</td><td>${h(i.periodEnd)}分まで</td>
+    <td class="n">${yen(t)}</td><td class="n">${yen(p)}</td><td class="n">${yen(t - p)}</td><td><span class="tag ${invState(i)}">${invState(i)}</span></td>
+    <td style="white-space:nowrap"><button class="s sm" onclick="A.print('inv','${i.id}')">表示・印刷</button> <button class="sm" onclick="A.payEdit('${i.id}')">入金登録</button>
+    ${i.payments.length ? '' : `<button class="d sm" onclick="A.delInv('${i.id}')">取消</button>`}</td></tr>`; }).join('') || '<tr><td colspan="9" class="muted">まだありません</td></tr>'}
+    </table></div></div>`;
+}
+
+/* --- 取引先 --- */
+function clients() {
+  return `<div class="card"><div class="bar"><button onclick="A.clientEdit()">＋ 取引先を追加</button><span class="muted">歯科医院ごとに締め日・掛率(料金表に対する割合)・支払条件を設定できます</span></div>
+  <div class="scroll"><table><tr><th>医院名</th><th>担当者</th><th>電話</th><th>締め日</th><th>掛率</th><th>支払</th><th></th></tr>
+  ${db.clients.map(c => `<tr><td>${h(c.name)}</td><td>${h(c.contact)}</td><td>${h(c.tel)}</td><td>${c.closing >= 31 ? '末日' : c.closing + '日'}</td><td>${c.rate}%</td><td>${h(c.payNote || '翌月末')}</td>
+  <td style="white-space:nowrap"><button class="s sm" onclick="A.clientEdit('${c.id}')">編集</button> <button class="d sm" onclick="A.delClient('${c.id}')">削除</button></td></tr>`).join('') || '<tr><td colspan="7" class="muted">取引先が未登録です</td></tr>'}
+  </table></div></div>`;
+}
+
+/* --- 料金表 --- */
+function prices() {
+  const rows = [...db.prices].sort((a, b) => (a.cat + a.code).localeCompare(b.cat + b.code));
+  return `<div class="card"><div class="bar"><button onclick="A.priceEdit()">＋ 品目を追加</button>
+  <span class="muted">⚠ 初期値はサンプルです。実際の料金に書き換えてください。保険の技工物は消費税「非課税」、自費は「10%」が一般的です(税理士にご確認ください)。</span></div>
+  <div class="scroll"><table><tr><th>コード</th><th>区分</th><th>品名</th><th class="n">基本単価</th><th>税区分</th><th>備考</th><th></th></tr>
+  ${rows.map(p => `<tr><td>${h(p.code)}</td><td>${h(p.cat)}</td><td>${h(p.name)}</td><td class="n">${yen(p.price)}</td><td>${p.tax ? p.tax + '%' : '非課税'}</td><td>${h(p.note)}</td>
+  <td style="white-space:nowrap"><button class="s sm" onclick="A.priceEdit('${p.id}')">編集</button> <button class="d sm" onclick="A.delPrice('${p.id}')">削除</button></td></tr>`).join('')}
+  </table></div></div>`;
+}
+
+/* --- 設定 --- */
+function set() {
+  const s = db.settings;
+  const f = (k, l, t = 'text') => `<div><label>${l}</label><input type="${t}" id="s_${k}" value="${h(s[k])}"></div>`;
+  return `<div class="card"><h2>自社情報(納品書・請求書に印字されます)</h2>
+  <div class="f">${f('name', '会社名・屋号')}${f('invoiceNo', 'インボイス登録番号(T+13桁)')}${f('zip', '郵便番号')}${f('addr', '住所')}${f('tel', '電話')}${f('fax', 'FAX')}${f('email', 'メール')}${f('payDays', '標準支払期限(請求日から○日後)', 'number')}</div>
+  <div class="f"><div><label>振込先(請求書に印字)</label><textarea id="s_bank" rows="3">${h(s.bank)}</textarea></div>
+  <div><label>技工士名(1行1名)</label><textarea id="s_techs" rows="3">${h(s.techs.join('\n'))}</textarea></div></div>
+  <button onclick="A.saveSettings()">設定を保存</button></div>
+  <div class="card"><h2>バックアップ</h2>
+  <p class="muted">データはこのブラウザ内にのみ保存されます。定期的にバックアップファイルを保存してください(PC変更時もこれで移行できます)。</p>
+  <div class="bar"><button onclick="A.backup()">バックアップを保存(JSON)</button>
+  <label class="btn s" style="margin:0;background:#fff;color:var(--pri-d);border:1px solid var(--pri)">復元する<input type="file" accept=".json" hidden onchange="A.restore(this.files[0])"></label>
+  <button class="d" onclick="A.reset()">全データを初期化</button></div></div>`;
+}
+
+/* ===== モーダル ===== */
+const dlg = $('#dlg');
+function modal(html) { dlg.innerHTML = html; if (!dlg.open) dlg.showModal(); }
+function closeModal() { dlg.close(); }
+const val = id => $('#' + id).value;
+
+let cur = null; // 編集中の技工物
+const A = {
+  /* 技工物 */
+  jobEdit(id) {
+    if (!db.clients.length) { alert('先に「取引先」を登録してください'); location.hash = 'clients'; return; }
+    const j = id ? db.jobs.find(x => x.id === id) : null;
+    cur = j ? JSON.parse(JSON.stringify(j)) : { id: '', no: '', clientId: db.clients[0].id, patient: '', receivedDate: today(), dueDate: addDays(today(), 7), status: '受付', tech: '', kind: '新規', memo: '', items: [A.blankItem()] };
+    A.jobForm();
+  },
+  blankItem: () => ({ name: '', teeth: '', shade: '', qty: 1, unit: 0, tax: 10 }),
+  jobForm() {
+    const j = cur, locked = !!j.deliveryId;
+    modal(`<h3>${j.id ? '技工物の編集 ' + h(j.no) : '技工物の受付'}</h3>
+    ${locked ? '<p class="muted">※納品書発行済みです。内容を変更しても発行済み納品書の金額は変わりません。</p>' : ''}
+    <div class="f">
+      <div><label>取引先(医院)</label><select id="j_client" onchange="cur.clientId=this.value">${db.clients.map(c => `<option value="${c.id}" ${c.id === j.clientId ? 'selected' : ''}>${h(c.name)}</option>`).join('')}</select></div>
+      <div><label>患者名(またはカルテNo.)</label><input id="j_patient" value="${h(j.patient)}"></div>
+      <div><label>受付日</label><input type="date" id="j_recv" value="${h(j.receivedDate)}"></div>
+      <div><label>納期</label><input type="date" id="j_due" value="${h(j.dueDate)}"></div>
+      <div><label>種別</label><select id="j_kind" onchange="A.kindChange(this.value)">${KINDS.map(k => `<option ${k === j.kind ? 'selected' : ''}>${k}</option>`).join('')}</select></div>
+      <div><label>担当技工士</label><input id="j_tech" list="techs" value="${h(j.tech)}"><datalist id="techs">${db.settings.techs.map(t => `<option value="${h(t)}">`).join('')}</datalist></div>
+      ${j.deliveryId ? '' : `<div><label>状態</label><select id="j_status">${STATUS.slice(0, 3).map(s => `<option ${s === j.status ? 'selected' : ''}>${s}</option>`).join('')}</select></div>`}
+    </div>
+    <div class="scroll"><table><thead><tr><th>品名(料金表から選択可)</th><th>歯式</th><th>シェード</th><th>数量</th><th>単価</th><th>税</th><th class="n">小計</th><th></th></tr></thead>
+    <tbody id="itemBody"></tbody></table></div>
+    <div class="bar" style="margin-top:8px"><button class="s sm" onclick="A.addItem()">＋ 品目を追加</button><span class="sp"></span><b id="jTotal"></b></div>
+    <div><label>メモ(指示内容・注意事項)</label><textarea id="j_memo" rows="2" style="width:100%">${h(j.memo)}</textarea></div>
+    <div class="bar" style="margin-top:12px"><button onclick="A.jobSave()">保存</button><button class="s" onclick="closeModal()">キャンセル</button><span class="sp"></span>
+    ${j.id ? '<button class="d" onclick="A.jobDelete()">削除</button>' : ''}</div>`);
+    A.itemRows();
+  },
+  kindChange(k) { cur.kind = k; if (k === '再製(無償)' && confirm('全品目の単価を0円にしますか?')) { cur.items.forEach(i => i.unit = 0); A.itemRows(); } },
+  itemRows() {
+    $('#itemBody').innerHTML = cur.items.map((it, n) => `<tr>
+      <td><input list="priceNames" value="${h(it.name)}" onchange="A.pickItem(${n},this.value)" style="width:190px"></td>
+      <td><input value="${h(it.teeth)}" placeholder="例 右上6" oninput="cur.items[${n}].teeth=this.value" style="width:90px"></td>
+      <td><input value="${h(it.shade)}" placeholder="例 A2" oninput="cur.items[${n}].shade=this.value" style="width:60px"></td>
+      <td><input type="number" min="1" value="${it.qty}" oninput="cur.items[${n}].qty=+this.value||0;A.itemTotal()" style="width:60px"></td>
+      <td><input type="number" min="0" value="${it.unit}" oninput="cur.items[${n}].unit=+this.value||0;A.itemTotal()" style="width:90px"></td>
+      <td><select onchange="cur.items[${n}].tax=+this.value;A.itemTotal()"><option value="10" ${it.tax == 10 ? 'selected' : ''}>10%</option><option value="8" ${it.tax == 8 ? 'selected' : ''}>8%</option><option value="0" ${!it.tax ? 'selected' : ''}>非課税</option></select></td>
+      <td class="n" id="sub${n}">${yen(it.qty * it.unit)}</td><td><button class="d sm" onclick="A.rmItem(${n})">×</button></td></tr>`).join('');
+    A.itemTotal();
+  },
+  itemTotal() {
+    cur.items.forEach((it, n) => { const e = $('#sub' + n); if (e) e.textContent = yen(it.qty * it.unit); });
+    $('#jTotal').textContent = '合計(税込) ' + yen(totals(cur.items).total);
+  },
+  pickItem(n, name) {
+    const it = cur.items[n]; it.name = name;
+    const p = db.prices.find(x => x.name === name);
+    if (p) { const rate = (client(cur.clientId).rate ?? 100) / 100; it.unit = cur.kind === '再製(無償)' ? 0 : Math.round(p.price * rate); it.tax = p.tax; }
+    A.itemRows();
+  },
+  addItem() { cur.items.push(A.blankItem()); A.itemRows(); },
+  rmItem(n) { cur.items.splice(n, 1); if (!cur.items.length) cur.items.push(A.blankItem()); A.itemRows(); },
+  jobSave() {
+    const j = cur;
+    j.clientId = val('j_client'); j.patient = val('j_patient').trim(); j.receivedDate = val('j_recv'); j.dueDate = val('j_due');
+    j.tech = val('j_tech').trim(); j.kind = val('j_kind'); j.memo = val('j_memo');
+    if (!j.deliveryId) j.status = val('j_status');
+    j.items = j.items.filter(i => i.name.trim());
+    if (!j.patient) { alert('患者名を入力してください'); return; }
+    if (!j.id) { j.id = uid(); j.no = nextNo('J' + j.receivedDate.replace(/-/g, '').slice(2, 6)); db.jobs.push(j); }
+    else db.jobs[db.jobs.findIndex(x => x.id === j.id)] = j;
+    save(); closeModal(); render();
+  },
+  jobDelete() { if (confirm('この技工物を削除しますか?')) { db.jobs = db.jobs.filter(x => x.id !== cur.id); save(); closeModal(); render(); } },
+  jobStatus(id, s) { db.jobs.find(j => j.id === id).status = s; save(); render(); },
+  jobSheet(id) {
+    const j = db.jobs.find(x => x.id === id), s = db.settings;
+    $('#printArea').innerHTML = `<div class="doc"><h1>作 業 票</h1>
+      <div class="row"><div>案件No:<b>${h(j.no)}</b>(${h(j.kind)})<br>医院:<b>${h(client(j.clientId).name)}</b><br>患者名:<b>${h(j.patient)}</b></div>
+      <div style="text-align:right">受付日:${h(j.receivedDate)}<br>納期:<b>${h(j.dueDate)}</b><br>担当:${h(j.tech)}</div></div>
+      <table><tr><th>品名</th><th>歯式</th><th>シェード</th><th>数量</th></tr>${j.items.map(i => `<tr><td>${h(i.name)}</td><td>${h(i.teeth)}</td><td>${h(i.shade)}</td><td class="n">${i.qty}</td></tr>`).join('')}</table>
+      <p>指示・注意事項:</p><div style="border:1px solid #888;min-height:120px;padding:6px;white-space:pre-wrap">${h(j.memo)}</div>
+      <p style="margin-top:20px">${h(s.name)}</p></div>`;
+    window.print();
+  },
+  jobsCsv() {
+    const rows = [['案件No', '受付日', '納期', '医院', '患者', '種別', '内容', '担当', '状態', '税込金額']];
+    db.jobs.forEach(j => rows.push([j.no, j.receivedDate, j.dueDate, client(j.clientId).name, j.patient, j.kind, itemsText(j), j.tech, j.status, jobTotal(j)]));
+    download('技工物一覧.csv', '﻿' + rows.map(r => r.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(',')).join('\r\n'), 'text/csv');
+  },
+
+  /* 納品書 */
+  makeDeliv() {
+    const ids = [...document.querySelectorAll('.rdy:checked')].map(e => e.value);
+    if (!ids.length) { alert('案件を選択してください'); return; }
+    const date = val('dDate'), groups = {};
+    ids.forEach(id => { const j = db.jobs.find(x => x.id === id); (groups[j.clientId] = groups[j.clientId] || []).push(j); });
+    Object.entries(groups).forEach(([cid, js]) => {
+      const d = { id: uid(), no: nextNo('D' + date.replace(/-/g, '').slice(2, 6)), clientId: cid, date, jobIds: js.map(j => j.id), invoiceId: '', lines: [] };
+      js.forEach(j => { j.status = '納品済'; j.deliveryId = d.id; j.items.forEach(i => d.lines.push({ jobNo: j.no, patient: j.patient, name: i.name, teeth: i.teeth, shade: i.shade, qty: i.qty, unit: i.unit, tax: i.tax })); });
+      db.deliveries.push(d);
+    });
+    save(); render();
+    const last = db.deliveries[db.deliveries.length - 1]; if (confirm('納品書を作成しました。印刷画面を開きますか?')) A.print('deliv', last.id);
+  },
+  delDeliv(id) {
+    if (!confirm('納品書を取り消し、案件を「完成」に戻しますか?')) return;
+    const d = db.deliveries.find(x => x.id === id);
+    db.jobs.forEach(j => { if (j.deliveryId === id) { j.deliveryId = ''; j.status = '完成'; } });
+    db.deliveries = db.deliveries.filter(x => x.id !== id); save(); render();
+  },
+
+  /* 請求書 */
+  makeInv() {
+    const month = val('iMonth'); S.invMonth = month; if (!month) return;
+    const [y, m] = month.split('-').map(Number), last = new Date(y, m, 0).getDate();
+    let made = 0;
+    db.clients.forEach(c => {
+      const end = `${month}-${pad(Math.min(c.closing || 31, last))}`;
+      const ds = db.deliveries.filter(d => d.clientId === c.id && !d.invoiceId && d.date <= end);
+      if (!ds.length) return;
+      const issue = today() > end ? today() : end;
+      const i = { id: uid(), no: nextNo('I' + month.replace('-', '').slice(2)), clientId: c.id, issueDate: issue, periodEnd: end, dueDate: addDays(issue, db.settings.payDays || 30), deliveryIds: ds.map(d => d.id), payments: [] };
+      ds.forEach(d => d.invoiceId = i.id); db.invoices.push(i); made++;
+    });
+    save(); render(); alert(made ? `請求書を${made}件作成しました` : '請求対象の納品書がありません');
+  },
+  delInv(id) { if (!confirm('請求書を取り消しますか?(納品書は未請求に戻ります)')) return; db.deliveries.forEach(d => { if (d.invoiceId === id) d.invoiceId = ''; }); db.invoices = db.invoices.filter(i => i.id !== id); save(); render(); },
+  payEdit(id) {
+    const i = db.invoices.find(x => x.id === id), bal = invTotal(i) - invPaid(i);
+    modal(`<h3>入金登録 ${h(i.no)} ${h(client(i.clientId).name)}</h3><p>請求額 ${yen(invTotal(i))} / 入金済 ${yen(invPaid(i))} / <b>残高 ${yen(bal)}</b></p>
+    <div class="f"><div><label>入金日</label><input type="date" id="p_date" value="${today()}"></div><div><label>金額</label><input type="number" id="p_amt" value="${bal}"></div>
+    <div><label>方法</label><select id="p_m"><option>振込</option><option>現金</option><option>口座振替</option><option>相殺</option></select></div></div>
+    <div class="bar"><button onclick="A.paySave('${id}')">登録</button><button class="s" onclick="closeModal()">閉じる</button></div>
+    ${i.payments.length ? `<table><tr><th>入金日</th><th>方法</th><th class="n">金額</th><th></th></tr>${i.payments.map((p, n) => `<tr><td>${h(p.date)}</td><td>${h(p.method)}</td><td class="n">${yen(p.amount)}</td><td><button class="d sm" onclick="A.payDel('${id}',${n})">削除</button></td></tr>`).join('')}</table>` : ''}`);
+  },
+  paySave(id) { const a = +val('p_amt'); if (!a) return; db.invoices.find(i => i.id === id).payments.push({ date: val('p_date'), amount: a, method: val('p_m') }); save(); closeModal(); render(); },
+  payDel(id, n) { db.invoices.find(i => i.id === id).payments.splice(n, 1); save(); A.payEdit(id); render(); },
+
+  /* 取引先 */
+  clientEdit(id) {
+    const c = id ? db.clients.find(x => x.id === id) : { id: '', name: '', contact: '', zip: '', addr: '', tel: '', email: '', closing: 31, rate: 100, payNote: '翌月末払い' };
+    const f = (k, l, t = 'text') => `<div><label>${l}</label><input type="${t}" id="c_${k}" value="${h(c[k])}"></div>`;
+    modal(`<h3>${id ? '取引先の編集' : '取引先の追加'}</h3><div class="f">${f('name', '医院名')}${f('contact', '担当者')}${f('zip', '郵便番号')}${f('addr', '住所')}${f('tel', '電話')}${f('email', 'メール')}
+    <div><label>締め日(31=末日)</label><input type="number" id="c_closing" min="1" max="31" value="${c.closing}"></div>
+    <div><label>掛率(%) 料金表×掛率が単価になります</label><input type="number" id="c_rate" min="0" value="${c.rate}"></div>${f('payNote', '支払条件')}</div>
+    <div class="bar"><button onclick="A.clientSave('${id || ''}')">保存</button><button class="s" onclick="closeModal()">キャンセル</button></div>`);
+  },
+  clientSave(id) {
+    const c = { id: id || uid(), closing: Math.min(31, +val('c_closing') || 31), rate: val('c_rate') === '' ? 100 : +val('c_rate') };
+    ['name', 'contact', 'zip', 'addr', 'tel', 'email', 'payNote'].forEach(k => c[k] = val('c_' + k).trim());
+    if (!c.name) { alert('医院名を入力してください'); return; }
+    if (id) db.clients[db.clients.findIndex(x => x.id === id)] = c; else db.clients.push(c);
+    save(); closeModal(); render();
+  },
+  delClient(id) {
+    if (db.jobs.some(j => j.clientId === id)) { alert('この取引先には技工物の履歴があるため削除できません'); return; }
+    if (confirm('削除しますか?')) { db.clients = db.clients.filter(c => c.id !== id); save(); render(); }
+  },
+
+  /* 料金表 */
+  priceEdit(id) {
+    const p = id ? price(id) : { code: '', cat: '', name: '', price: 0, tax: 10, note: '' };
+    modal(`<h3>${id ? '品目の編集' : '品目の追加'}</h3><div class="f">
+    <div><label>コード</label><input id="pr_code" value="${h(p.code)}"></div>
+    <div><label>区分(例: 保険 冠・ブリッジ)</label><input id="pr_cat" list="cats" value="${h(p.cat)}"><datalist id="cats">${[...new Set(db.prices.map(x => x.cat))].map(c => `<option value="${h(c)}">`).join('')}</datalist></div>
+    <div><label>品名</label><input id="pr_name" value="${h(p.name)}"></div>
+    <div><label>基本単価(税抜)</label><input type="number" id="pr_price" value="${p.price}"></div>
+    <div><label>税区分</label><select id="pr_tax"><option value="10" ${p.tax == 10 ? 'selected' : ''}>10%</option><option value="8" ${p.tax == 8 ? 'selected' : ''}>8%</option><option value="0" ${!p.tax ? 'selected' : ''}>非課税</option></select></div>
+    <div><label>備考</label><input id="pr_note" value="${h(p.note)}"></div></div>
+    <div class="bar"><button onclick="A.priceSave('${id || ''}')">保存</button><button class="s" onclick="closeModal()">キャンセル</button></div>`);
+  },
+  priceSave(id) {
+    const p = { id: id || uid(), code: val('pr_code').trim(), cat: val('pr_cat').trim(), name: val('pr_name').trim(), price: +val('pr_price') || 0, tax: +val('pr_tax'), note: val('pr_note').trim() };
+    if (!p.name) { alert('品名を入力してください'); return; }
+    if (id) db.prices[db.prices.findIndex(x => x.id === id)] = p; else db.prices.push(p);
+    save(); closeModal(); render();
+  },
+  delPrice(id) { if (confirm('削除しますか?(過去の技工物・納品書には影響しません)')) { db.prices = db.prices.filter(p => p.id !== id); save(); render(); } },
+
+  /* 設定・バックアップ */
+  saveSettings() {
+    const s = db.settings;
+    ['name', 'invoiceNo', 'zip', 'addr', 'tel', 'fax', 'email', 'bank'].forEach(k => s[k] = val('s_' + k).trim());
+    s.payDays = +val('s_payDays') || 30;
+    s.techs = val('s_techs').split('\n').map(x => x.trim()).filter(Boolean);
+    save(); alert('保存しました');
+  },
+  backup() { download(`技工所バックアップ_${today()}.json`, JSON.stringify(db, null, 1), 'application/json'); },
+  restore(file) {
+    if (!file) return;
+    const r = new FileReader();
+    r.onload = () => {
+      try { const d = JSON.parse(r.result); if (!d.settings || !d.jobs) throw 0; if (!confirm('現在のデータを上書きして復元します。よろしいですか?')) return; db = d; save(); render(); alert('復元しました'); }
+      catch (e) { alert('バックアップファイルが正しくありません'); }
+    };
+    r.readAsText(file);
+  },
+  reset() { if (confirm('全データを削除して初期状態に戻します。よろしいですか?(事前にバックアップ推奨)') && confirm('本当に初期化しますか?')) { db = seed(); save(); render(); } },
+
+  /* 印刷 */
+  print(type, id) {
+    const s = db.settings;
+    const me = `<div style="text-align:right;line-height:1.6"><b style="font-size:15px">${h(s.name)}</b><br>${s.zip ? '〒' + h(s.zip) + ' ' : ''}${h(s.addr)}<br>TEL ${h(s.tel)}${s.fax ? ' / FAX ' + h(s.fax) : ''}${s.invoiceNo ? '<br>登録番号 ' + h(s.invoiceNo) : ''}</div>`;
+    const taxLabel = t => t ? t + '%' : '非課税';
+    const sumTable = lines => {
+      const t = totals(lines);
+      return `<table class="tot">${Object.keys(t.by).sort((a, b) => b - a).map(r => `<tr><td>${taxLabel(+r)}対象 小計</td><td class="n">${yen(t.by[r].sub)}</td></tr>${+r ? `<tr><td>消費税(${r}%)</td><td class="n">${yen(t.by[r].tax)}</td></tr>` : ''}`).join('')}
+      <tr><th>合計(税込)</th><th class="n">${yen(t.total)}</th></tr></table>`;
+    };
+    let html;
+    if (type === 'deliv') {
+      const d = db.deliveries.find(x => x.id === id), c = client(d.clientId);
+      html = `<div class="doc"><h1>納 品 書</h1>
+      <div class="row"><div><span class="to">${h(c.name)} 御中</span><p>下記の通り納品いたします。</p></div>
+      <div>${me}<div style="text-align:right;margin-top:6px">納品書No: ${h(d.no)}<br>納品日: ${h(d.date)}</div></div></div>
+      <table><tr><th>患者名</th><th>品名</th><th>歯式</th><th>色</th><th>数量</th><th>単価</th><th>税</th><th>金額</th></tr>
+      ${d.lines.map(l => `<tr><td>${h(l.patient)}</td><td>${h(l.name)}</td><td>${h(l.teeth)}</td><td>${h(l.shade)}</td><td class="n">${l.qty}</td><td class="n">${yen(l.unit)}</td><td>${taxLabel(l.tax)}</td><td class="n">${yen(l.qty * l.unit)}</td></tr>`).join('')}</table>
+      ${sumTable(d.lines)}</div>`;
+    } else {
+      const i = db.invoices.find(x => x.id === id), c = client(i.clientId), lines = invLines(i), t = totals(lines), paid = invPaid(i);
+      html = `<div class="doc"><h1>請 求 書</h1>
+      <div class="row"><div><span class="to">${h(c.name)} 御中</span><p>下記の通りご請求申し上げます。</p>
+      <div class="big">ご請求金額 ${yen(t.total)}</div><br>お支払期限: ${h(i.dueDate)}</div>
+      <div>${me}<div style="text-align:right;margin-top:6px">請求書No: ${h(i.no)}<br>発行日: ${h(i.issueDate)}<br>締め日: ${h(i.periodEnd)}</div></div></div>
+      <table><tr><th>納品日</th><th>納品書</th><th>患者名</th><th>品名</th><th>数量</th><th>単価</th><th>税</th><th>金額</th></tr>
+      ${invDelivs(i).map(d => d.lines.map(l => `<tr><td>${h(d.date)}</td><td>${h(d.no)}</td><td>${h(l.patient)}</td><td>${h(l.name)}${l.teeth ? ' ' + h(l.teeth) : ''}</td><td class="n">${l.qty}</td><td class="n">${yen(l.unit)}</td><td>${taxLabel(l.tax)}</td><td class="n">${yen(l.qty * l.unit)}</td></tr>`).join('')).join('')}</table>
+      ${sumTable(lines)}
+      ${paid ? `<p style="text-align:right">入金済 ${yen(paid)} / 残高 <b>${yen(t.total - paid)}</b></p>` : ''}
+      <div style="margin-top:14px;border:1px solid #888;padding:8px"><b>お振込先</b><br><span style="white-space:pre-wrap">${h(s.bank) || '(設定画面で振込先を登録してください)'}</span><br><span class="muted">※振込手数料はご負担ください。</span></div></div>`;
+    }
+    $('#printArea').innerHTML = html;
+    modal(`<div class="bar"><button onclick="window.print()">🖨 印刷 / PDF保存</button><button class="s" onclick="closeModal()">閉じる</button></div><div style="border:1px solid var(--line);padding:12px">${html}</div>`);
+  }
+};
+
+function download(name, text, type) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type }));
+  a.download = name; a.click(); URL.revokeObjectURL(a.href);
+}
+render();
+</script>
+</body>
+</html>
